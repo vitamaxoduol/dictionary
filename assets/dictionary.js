@@ -1,135 +1,115 @@
-const wrapper = document.querySelector(".wrapper"),
-  searchInput = wrapper.querySelector("input"),
-  synonyms = wrapper.querySelector(".synonym .list"),
-  volume = wrapper.querySelector(".word i"),
-  removeIcon = wrapper.querySelector(".search span"),
-  infoText = wrapper.querySelector(".info-text");
-let audio; document.getElementById("audio");
+class SearchWord {
+  constructor() {
+    this.args = {
+      wrapper: document.querySelector(".wrapper"),
+      searchInput: document.querySelector("input"),
+      removeIcon: document.querySelector(".search span"),
+      infoText: document.querySelector(".info-text"),
+    };
 
-
-volume.addEventListener("click", (e) => {
-  if (e.target.nextElementSibling.getAttribute ("src") === "") {
-    console.error("No media file found");
-  } else{
-    audio.play();
+    this.returned = [];
   }
-});
-
-searchInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    fetchApi(e.target.value);
-  }
-});
-
-removeIcon.addEventListener("click", () => {
-  searchInput.value = "";
-  searchInput.focus();
-  wrapper.classList.remove("active")
-  infoText.style.color = "#9a9a9a"
-  infoText.innerHTML = "Type any existing word and press enter to get meaning, example, synonyms, etc."
-}); 
-
-
-// fetch api function
-// @param {*} word
-function fetchApi(word) {
-  infoText.style.color = "#000";
-  wrapper.classList.remove("active");
-  infoText.innerHTML = `Searching the meaning of <span>"${word}"</span>`;
-  let url = `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`;
-
-  fetch(url)
-    .then((res) => res.json())
-    .then((result) => data(result, word))
-    .catch(err => console.error(err));
-    
-}
-
-
-  // Data Processing Function
-  // @param {*} result 
-  // @param {*} word 
-  // @returns 
- 
- function data(result, word) {
-  if (result.title) {
-    wrapper.querySelector(".word p").innerText = word;
-    infoText.innerHTML = `${result.message}`;
-    wrapper.querySelector("ul").style.height = "0";
-    wrapper.querySelector("ul").style.opacity = 0;
-  } else {
-    const newDefinition = new Definition(result);
-    const newSynonym = new Synonym(result);
-    const newExample = new Example(result);
-
-    newDefinition.renderDefinition();
-    newExample.renderExample();
-    newSynonym.renderSynonyms();
-  }
-}
-
-class Definition {
-  constructor(result) {
-    this.result = result;
-    this.show();
-    this.renderPhonetics();
+  searchWord() {
+    const { wrapper, searchInput, removeIcon, infoText, audio } = this.args;
+    removeIcon.addEventListener("click", () => {
+      this.clearInput(searchInput, wrapper, infoText);
+    });
+    let num = 0;
+    searchInput.addEventListener("keyup", ({ key }) => {
+      if (key === "Enter") {
+        num++;
+        this.submitWord(wrapper, searchInput, infoText, audio);
+      }
+      if (num > 1) {
+        let x = document.querySelector(".synonym .list");
+        x.innerHTML = "";
+        num = 1;
+      }
+    });
   }
 
-  show() {
-    wrapper.classList.add("active");
-    wrapper.querySelector("ul").style.height = "100%";
-    wrapper.querySelector("ul").style.opacity = 1;
-    wrapper.querySelector(".word p").innerText = this.result[0].word;
+  clearInput(searchInput, wrapper, infoText) {
+    searchInput.value = "";
+    wrapper.classList.remove("active");
+    infoText.innerHTML = `Type any existing word and press enter to get meaning, example, synonyms, etc.`;
   }
-
-  renderPhonetics() {
-    let phoneticsText = `Commonly pronounced as ${this.result[0].phonetics[0].text}`;
-    let phoneticsAudio = this.result[0].phonetics[this.result[0].phonetics.length - 1].audio;
-
-    wrapper.querySelector(".word span").innerText = phoneticsText;
-
-    if (phoneticsAudio) {
-      audio.setAttribute("src", phoneticsAudio);
-      volume.style.color = "#942B1F";
+  // fetch data function
+  submitWord(wrapper, searchInput, infoText) {
+    if (searchInput.value === "") {
+      wrapper.classList.remove("active");
+      infoText.innerHTML = `Type any existing word and press enter to get meaning, example,
+      synonyms, etc.`;
+      return;
     }
+    infoText.innerHTML = `Searching the meaning of <span>"${searchInput.value}"</span>`;
+    let url = `https://api.dictionaryapi.dev/api/v2/entries/en/${searchInput.value}`;
+    fetch(url)
+      .then((r) => r.json())
+      .then((res) => {
+        let searchedWord = searchInput.value;
+        let answer = { res, searchedWord };
+        this.returned = answer;
+        searchInput.value = `${searchedWord}`;
+        this.postData(wrapper);
+        this.openWrapper(wrapper);
+      })
+      .catch((error) => {
+        console.log("Error:", error);
+        infoText.innerHTML = `The Word "${searchInput.value}" is not found! Please search another word!`;
+        this.closeWrapper(wrapper, searchInput);
+      });
   }
 
-  renderDefinition() {
-    wrapper.querySelector(".meaning span").innerText = this.result[0].meanings[0].definitions[0].definition;
-  }
-}
-
-class Synonym {
-  constructor(result) {
-    this.result_synonyms = result[0].meanings[0].synonyms;
-  }
-
-  renderSynonyms() {
-    if (this.result_synonyms.length === 0) {
-      syns.parentElement.style.display = "none";
-    } else {
-      syns.parentElement.style.display = "block";
-      syns.innerHTML = "";
-
-      for (let i = 0; i < this.result_synonyms.length; i++) {
-        let tag = `<span onclick=fetchApi('${this.result_synonyms[i]}')>${this.result_synonyms[i]}</span>`;
-        syns.insertAdjacentHTML("beforeend", tag)
+  postData(wrapper) {
+    let phonetic = wrapper.querySelector(".word p");
+    let speech = wrapper.querySelector(".word span");
+    let volume = wrapper.querySelector(".word i");
+    let meaning = wrapper.querySelector(".meaning span");
+    let example = wrapper.querySelector(".example span");
+    let synonyms = wrapper.querySelector(".synonym .list");
+    function random(num) {
+      return Math.floor(Math.random() * num);
+    }
+    let audioChoosen = random(this.returned.res[0].phonetics.length);
+    volume.addEventListener("click", (e) => {
+      new Audio(this.returned.res[0].phonetics[audioChoosen].audio).play();
+    });
+    let a = random(this.returned.res[0].meanings[0].definitions.length);
+    let c = this.returned.res[0].meanings[0].definitions[a].example;
+    let d = this.returned.res[0].meanings[0].synonyms;
+    let e = random(this.returned.res[0].meanings[0].synonyms.length);
+    if (a !== undefined) {
+      phonetic.innerHTML = this.returned.res[0].word;
+      speech.innerHTML = `${this.returned.res[0].meanings[0].partOfSpeech} ${this.returned.res[0].phonetic}`;
+      meaning.innerHTML =
+        this.returned.res[0].meanings[0].definitions[a].definition;
+      if (c !== undefined) {
+        example.innerHTML = c;
+      } else {
+        example.innerHTML = "No example available!";
+      }
+      if (d[e] !== undefined) {
+        d.slice().forEach((element) => {
+          synonyms.innerHTML += `<span>${element}</span>`;
+        });
+      } else {
+        synonyms.innerHTML = `<span>This word has no synonym</span>`;
       }
     }
   }
-}
 
-class Example {
-  constructor(result) {
-    this.result_example = result[0].meanings[0].definitions[0].example;
+  openWrapper(wrapper) {
+    setTimeout(() => {
+      wrapper.classList.add("active");
+    }, "500");
   }
 
-  renderExample() {
-    if (this.result_example === undefined) {
-      wrapper.querySelector(".example").style.display = "none";
-    } else {
-      wrapper.querySelector(".example span").innerText = this.result_example;
-    }
+  closeWrapper(wrapper) {
+    setTimeout(() => {
+      wrapper.classList.remove("active");
+    }, "200");
   }
 }
+
+const newFedData = new SearchWord();
+newFedData.searchWord();
